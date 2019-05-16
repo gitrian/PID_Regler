@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#define PQ 5
+#define PW 5
+
 void setup() {
   pinMode(9, OUTPUT);
   pinMode(10, OUTPUT);
@@ -7,36 +10,40 @@ void setup() {
   pinMode(6, OUTPUT);
 }
 
-void calc_PID(long *q_ref, long *q_m, long *tau_arr, long *PID_arr) {
-  long q_konjm[4], q_err[3][3], v[9];
+void calc_PID(long *q_ref, long *q_m, long *tau_arr, long *ang_velo) {
 
-  q_konjm[0]=q_m[0];
-  q_konjm[1]=-q_m[1];
-  q_konjm[2]=-q_m[2];
-  q_konjm[3]=-q_m[3];
+  //calculate the error quaternion:
+  long q_err[3] = {q_ref[0]*(-q_m[1]) + q_ref[1]*q_m[0] + q_ref[2]*(-q_m[3]) - q_ref[3]*(-q_m[2]),
+                   q_ref[0]*(-q_m[2]) - q_ref[1]*(-q_m[3]) + q_ref[2]*q_m[0] + q_ref[3]*(-q_m[1]),
+                   q_ref[0]*(-q_m[3]) + q_ref[1]*(-q_m[2]) - q_ref[2]*(-q_m[1]) + q_ref[3]*q_m[0]};
 
-  for (int a=1; a<4; a++) {
-    q_err[0][a] = q_ref[1] * q_konjm[a];
-    q_err[1][a] = q_ref[2] * q_konjm[a];
-    q_err[2][a] = q_ref[3] * q_konjm[a];
-  }
+  //outer loop proportional controller for angular velocity reference tracking:
+  tau_arr[0] = - (PQ * q_err[0]);
+  tau_arr[1] = - (PQ * q_err[1]);
+  tau_arr[2] = - (PQ * q_err[2]);
 
-  //calculate vector v:
-  v[0] = q_m[0]*q_m[0] + q_m[1]*q_m[1] - q_m[2]*q_m[2] - q_m[3]*q_m[3];
-  v[1] = 2 * (q_m[1]*q_m[2] + q_m[0]*q_m[3]);
-  v[2] = 2 * (q_m[1]*q_m[3] - q_m[0]*q_m[2]);
-  v[3] = 2 * (q_m[1]*q_m[2] - q_m[0]*q_m[3]);
-  v[4] = q_m[0]*q_m[0] - q_m[1]*q_m[1] + q_m[2]*q_m[2] - q_m[3]*q_m[3];
-  v[5] = 2 * (q_m[2]*q_m[3] + q_m[0]*q_m[1]);
-  v[6] = 2 * (q_m[1]*q_m[3] + q_m[0]*q_m[2]);
-  v[7] = 2 * (q_m[2]*q_m[3] - q_m[0]*q_m[1]);
-  v[8] = q_m[0]*q_m[0] - q_m[1]*q_m[1] - q_m[2]*q_m[2] + q_m[3]*q_m[3];
+  //inner loop proportional controller for angular velocity:
+  tau_arr[0] -= PW * ang_velo[0];
+  tau_arr[1] -= PW * ang_velo[1];
+  tau_arr[2] -= PW * ang_velo[2];
+
+  /*calculate Rotation Matrix:
+  R[0][0] = q_m[0]*q_m[0] + q_m[1]*q_m[1] - q_m[2]*q_m[2] - q_m[3]*q_m[3];
+  R[1][0] = 2 * (q_m[1]*q_m[2] + q_m[0]*q_m[3]);
+  R[2][0] = 2 * (q_m[1]*q_m[3] - q_m[0]*q_m[2]);
+  R[0][1] = 2 * (q_m[1]*q_m[2] - q_m[0]*q_m[3]);
+  R[1][1] = q_m[0]*q_m[0] - q_m[1]*q_m[1] + q_m[2]*q_m[2] - q_m[3]*q_m[3];
+  R[2][1] = 2 * (q_m[2]*q_m[3] + q_m[0]*q_m[1]);
+  R[0][2] = 2 * (q_m[1]*q_m[3] + q_m[0]*q_m[2]);
+  R[1][2] = 2 * (q_m[2]*q_m[3] - q_m[0]*q_m[1]);
+  R[2][2] = q_m[0]*q_m[0] - q_m[1]*q_m[1] - q_m[2]*q_m[2] + q_m[3]*q_m[3];*/
 }
 
-void loop() {
-  long q_ref_arr[4], q_m_arr[4], tau_arr[3], PID_arr[3];
 
-  calc_PID(q_ref_arr, q_m_arr, tau_arr, PID_arr);
+void loop() {
+  long q_ref_arr[4], q_m_arr[4], tau_arr[3], ang_velo[3];
+
+  calc_PID(q_ref_arr, q_m_arr, tau_arr, ang_velo);
 }
 
 void Loop_Motors() {
